@@ -1,0 +1,8 @@
+{
+  "name": "Remix Hệ thống Quản lý Hồ sơ Định giá",
+  "description": "Ứng dụng quản lý thông tin, tiến độ, trạng thái và báo cáo thống kê hồ sơ thẩm định giá tài sản",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
