@@ -852,6 +852,24 @@ export const DossierFormModal: React.FC<DossierFormModalProps> = ({
       return;
     }
 
+    // Nếu chưa điền "Địa chỉ vị trí tài sản đầy đủ", thử tự ghép từ các phần
+    // (số nhà/toà nhà, phường, quận, tỉnh) trước khi chặn submit.
+    let resolvedAssetAddress = formData.assetAddress?.trim();
+    if (!resolvedAssetAddress) {
+      const autoParts: string[] = [];
+      if (formData.houseNumber) autoParts.push(formData.houseNumber);
+      else if (formData.buildingName) autoParts.push(formData.buildingName);
+      if (formData.ward) autoParts.push(formData.ward);
+      if (formData.district) autoParts.push(formData.district);
+      if (formData.province) autoParts.push(formData.province);
+      resolvedAssetAddress = autoParts.join(', ');
+    }
+
+    if (!resolvedAssetAddress) {
+      alert('Vui lòng điền "Địa chỉ vị trí tài sản đầy đủ" (hoặc Số nhà/Phường/Quận/Tỉnh) trước khi lưu hồ sơ!');
+      return;
+    }
+
     const marketOrApproved = Number(formData.approvedValue) || Number(formData.marketPrice) || Number(formData.estimatedValue) || 0;
     const feeVal = Number(formData.totalValuationFee) || Number(formData.serviceFee) || 0;
 
@@ -880,7 +898,7 @@ export const DossierFormModal: React.FC<DossierFormModalProps> = ({
 
       assetName: formData.assetName || '',
       assetCategory: (formData.assetCategory as AssetCategory) || 'DAT_VA_TAI_SAN_GAN_LIEN_VOI_DAT',
-      assetAddress: formData.assetAddress || '',
+      assetAddress: resolvedAssetAddress,
 
       // Sheet 1: Địa chỉ & Căn hộ
       landPlotNumber: formData.landPlotNumber,
@@ -1519,7 +1537,7 @@ export const DossierFormModal: React.FC<DossierFormModalProps> = ({
                   </div>
 
                   <div className="sm:col-span-2 md:col-span-4">
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">Địa chỉ vị trí tài sản đầy đủ</label>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">Địa chỉ vị trí tài sản đầy đủ (*)</label>
                     <input
                       type="text"
                       placeholder="VD: Dự án tổ hợp nhà ở, văn phòng làm việc và dịch vụ, xã Tả Thanh Oai, huyện Thanh Trì, thành phố Hà Nội"
