@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { LogOut } from 'lucide-react';
 import { isDossierLocked } from './utils/formatters';
 import { ValuationDossier, DossierStatus } from './types/dossier';
-import { loadDossiers, saveDossiers, resetDossiersToDefault } from './utils/storage';
+import { fetchDossiers, createDossier, updateDossier, deleteDossier, bulkImportDossiers, resetDossiers } from './utils/dossierApi';
 import { exportDossiersToExcel } from './utils/excel';
 import { Header } from './components/Header';
 import { StatsCards } from './components/StatsCards';
@@ -130,41 +130,59 @@ function MainAppContent() {
 
   // Load dossiers on startup
   useEffect(() => {
-    const loaded = loadDossiers();
-    setDossiers(loaded);
+    fetchDossiers()
+      .then(setDossiers)
+      .catch((err) => {
+        console.error(err);
+        alert('Không thể tải dữ liệu hồ sơ từ server. Vui lòng kiểm tra MongoDB và server đã chạy.');
+      });
   }, []);
 
-  // Save dossiers helper
+  // Update local UI state only; persistence is handled per-operation below
   const updateDossiersState = (newDossiers: ValuationDossier[]) => {
     setDossiers(newDossiers);
-    saveDossiers(newDossiers);
   };
 
   // Add / Edit Dossier
-  const handleSaveDossier = (savedItem: ValuationDossier) => {
+  const handleSaveDossier = async (savedItem: ValuationDossier) => {
     const exists = dossiers.some(d => d.id === savedItem.id);
+    const previous = dossiers;
     let updated: ValuationDossier[];
+    let withUser: ValuationDossier;
     if (exists) {
+      withUser = savedItem;
       updated = dossiers.map(d => d.id === savedItem.id ? savedItem : d);
     } else {
       // Set assigned appraiser to current user if not set
-      const withUser = {
+      withUser = {
         ...savedItem,
         assignedAppraiser: savedItem.assignedAppraiser || user?.name || 'Lê Văn Nam'
       };
       updated = [withUser, ...dossiers];
     }
     updateDossiersState(updated);
+
+    try {
+      if (exists) {
+        await updateDossier(withUser.id, withUser);
+      } else {
+        await createDossier(withUser);
+      }
+    } catch (err: any) {
+      setDossiers(previous);
+      alert('Lưu hồ sơ thất bại: ' + (err?.message || err));
+    }
   };
 
   // Update Status & Audit Log
-  const handleUpdateStatus = (id: string, newStatus: DossierStatus, reason?: string) => {
+  const handleUpdateStatus = async (id: string, newStatus: DossierStatus, reason?: string) => {
+    const previous = dossiers;
     const nowStr = new Date().toLocaleString('vi-VN');
     const updated = dossiers.map(item => {
       if (item.id === id) {
         const oldStatusLabel = getStatusConfig(item.status)?.label || item.status;
         const newStatusLabel = getStatusConfig(newStatus)?.label || newStatus;
-        
+
         let noteText = `Chuyển trạng thái từ [${oldStatusLabel}] sang [${newStatusLabel}]`;
         if (reason) {
           if (newStatus === 'TU_CHOI_BAO_CAO') {
@@ -211,25 +229,55 @@ function MainAppContent() {
         setExportDocState(prev => prev ? { ...prev, dossier: refreshed } : null);
       }
     }
+
+    try {
+      const refreshed = updated.find(d => d.id === id);
+      if (refreshed) {
+        await updateDossier(id, refreshed);
+      }
+    } catch (err: any) {
+      setDossiers(previous);
+      alert('Cập nhật trạng thái thất bại: ' + (err?.message || err));
+    }
   };
 
   // Delete Dossier
-  const handleDeleteDossier = (id: string) => {
+  const handleDeleteDossier = async (id: string) => {
+    const previous = dossiers;
     const updated = dossiers.filter(d => d.id !== id);
     updateDossiersState(updated);
+
+    try {
+      await deleteDossier(id);
+    } catch (err: any) {
+      setDossiers(previous);
+      alert('Xóa hồ sơ thất bại: ' + (err?.message || err));
+    }
   };
 
   // Import Dossiers from Excel / Google Sheets
-  const handleImportSuccess = (newImportedDossiers: ValuationDossier[]) => {
+  const handleImportSuccess = async (newImportedDossiers: ValuationDossier[]) => {
+    const previous = dossiers;
     const merged = [...newImportedDossiers, ...dossiers];
     updateDossiersState(merged);
+
+    try {
+      await bulkImportDossiers(newImportedDossiers);
+    } catch (err: any) {
+      setDossiers(previous);
+      alert('Import hồ sơ thất bại: ' + (err?.message || err));
+    }
   };
 
   // Reset Data to Default Mock Data
-  const handleResetData = () => {
+  const handleResetData = async () => {
     if (confirm('Khôi phục dữ liệu mẫu ban đầu? (Thao tác này sẽ ghi đè dữ liệu hiện tại)')) {
-      const reset = resetDossiersToDefault();
-      setDossiers(reset);
+      try {
+        const reset = await resetDossiers();
+        setDossiers(reset);
+      } catch (err: any) {
+        alert('Khôi phục dữ liệu thất bại: ' + (err?.message || err));
+      }
     }
   };
 

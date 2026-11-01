@@ -4,6 +4,8 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import { connectDB } from "./src/server/db";
+import dossierRouter from "./src/server/routes/dossiers";
 
 dotenv.config();
 
@@ -123,11 +125,16 @@ Bạn có thể chọn các câu hỏi gợi ý bên dưới hoặc nhập yêu 
 }
 
 async function startServer() {
+  await connectDB();
+
   const app = express();
   const PORT = 3000;
 
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+  // Hồ sơ (dossier) CRUD API, backed by MongoDB
+  app.use('/api/dossiers', dossierRouter);
 
   // Helper fallback for OCR when testing or if API key is not set
   function generateFallbackOcrResult(docTypeHint: string, fileName?: string): any {
